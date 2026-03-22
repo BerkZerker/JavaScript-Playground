@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spiking Neural Network</title>
+  <style>
+    body { margin: 0; background: #111; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="c" width="800" height="500"></canvas>
+  <script type="module">
+    import { neurons, edges } from "./main.js";
+
+    const canvas = document.getElementById("c");
+    const ctx = canvas.getContext("2d");
+    const R = 36;
+
+    // Track fire flashes per neuron and per edge
+    const fireFlash = neurons.map(() => 0);
+    const edgeFlash = edges.map(() => 0);
+
+    neurons.forEach((n, i) => {
+      n.neuron.onFire = () => {
+        fireFlash[i] = 1;
+        // Light up edges that originate from this neuron
+        edges.forEach((e, ei) => { if (e.from === i) edgeFlash[ei] = 1; });
+      };
+    });
+
+    function draw() {
+      // Update decay so charge drains smoothly between simulation steps
+      neurons.forEach(n => n.neuron.updateDecay());
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw edges
+      edges.forEach((e, ei) => {
+        const from = neurons[e.from];
+        const to = neurons[e.to];
+        const brightness = edgeFlash[ei];
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.strokeStyle = `rgba(100, 200, 255, ${0.15 + brightness * 0.85})`;
+        ctx.lineWidth = 1.5 + brightness * 3;
+        ctx.stroke();
+
+        // Arrow head
+        const angle = Math.atan2(to.y - from.y, to.x - from.x);
+        const tipX = to.x - Math.cos(angle) * (R + 4);
+        const tipY = to.y - Math.sin(angle) * (R + 4);
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(tipX - Math.cos(angle - 0.3) * 12, tipY - Math.sin(angle - 0.3) * 12);
+        ctx.lineTo(tipX - Math.cos(angle + 0.3) * 12, tipY - Math.sin(angle + 0.3) * 12);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(100, 200, 255, ${0.2 + brightness * 0.8})`;
+        ctx.fill();
+
+        edgeFlash[ei] *= 0.96;
+      });
+
+      // Draw neurons
+      neurons.forEach((n, i) => {
+        const charge = n.neuron.charge;
+        const fill = Math.min(charge / n.neuron.threshold, 1);
+        const flash = fireFlash[i];
+
+        // Outer ring
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, R, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(180, 220, 255, ${0.3 + flash * 0.7})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // Bucket fill from bottom to top using clipping
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, R - 2, 0, Math.PI * 2);
+        ctx.clip();
+
+        const fillHeight = fill * (R * 2);
+        const topY = n.y + R - fillHeight;
+
+        // Fill color shifts from teal to bright cyan as it fills, white flash on fire
+        const r = Math.round(30 + flash * 225);
+        const g = Math.round(120 + fill * 80 + flash * 135);
+        const b = Math.round(180 + fill * 75 + flash * 75);
+        ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+        ctx.fillRect(n.x - R, topY, R * 2, fillHeight);
+        ctx.restore();
+
+        // Label
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 16px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(n.label, n.x, n.y);
+
+        fireFlash[i] *= 0.95;
+      });
+
+      requestAnimationFrame(draw);
+    }
+
+    draw();
+  </script>
+</body>
+</html>
