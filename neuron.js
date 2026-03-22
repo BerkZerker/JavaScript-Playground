@@ -2,13 +2,22 @@
 
 export default class Neuron {
   constructor(connections, threshold, decay) {
+    // connections: neurons this neuron sends spikes TO
     this.connections = connections;
+    // inputs: tracked automatically — who sends spikes to THIS neuron, with weights
+    this.inputs = []; // [{neuron, weight}, ...]
     this.threshold = threshold;
     this.decay = decay;
     this.charge = 0.0;
     this.lastUpdate = Date.now();
     this.onFire = null;
     this.onCharge = null;
+    this.learningRate = 0.05;
+
+    // Register this neuron as an input on each connection target
+    connections.forEach((target) => {
+      target.inputs.push({ neuron: this, weight: 1.0 });
+    });
   }
 
   integrate(charge) {
@@ -24,9 +33,23 @@ export default class Neuron {
 
   fire() {
     if (this.onFire) this.onFire();
-    this.updateDecay(); // apply decay before firing
-    this.connections.forEach((neuron) => {
-      neuron.integrate(1.0); // send a charge of 1.0 to connected neurons
+    this.train();
+    this.connections.forEach((target) => {
+      // Find our weight on the target
+      const input = target.inputs.find((i) => i.neuron === this);
+      const weight = input ? input.weight : 1.0;
+      target.integrate(weight);
+    });
+  }
+
+  train() {
+    // Hebbian: strengthen inputs that recently fired (charge near 0 = just reset)
+    this.inputs.forEach((input) => {
+      const ratio = input.neuron.charge / input.neuron.threshold;
+      if (ratio < 0.2) {
+        // Input recently fired — it contributed to this spike
+        input.weight += this.learningRate;
+      }
     });
   }
 

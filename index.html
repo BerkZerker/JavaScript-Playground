@@ -59,6 +59,20 @@
         ctx.fillStyle = `rgba(100, 200, 255, ${0.2 + brightness * 0.8})`;
         ctx.fill();
 
+        // Show weight label at midpoint
+        const target = neurons[e.to].neuron;
+        const source = neurons[e.from].neuron;
+        const input = target.inputs.find(inp => inp.neuron === source);
+        if (input) {
+          const midX = (from.x + to.x) / 2;
+          const midY = (from.y + to.y) / 2;
+          const offsetX = e.from < e.to ? -20 : 20;
+          ctx.fillStyle = `rgba(180, 220, 255, ${0.4 + brightness * 0.6})`;
+          ctx.font = "12px monospace";
+          ctx.textAlign = "center";
+          ctx.fillText(input.weight.toFixed(2), midX + offsetX, midY - 10);
+        }
+
         edgeFlash[ei] *= 0.96;
       });
 
